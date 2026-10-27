@@ -9,6 +9,8 @@ from config.settings import settings
 from framework.api import booking_payload
 from framework.schemas import assert_matches_schema
 
+pytestmark = pytest.mark.booking
+
 
 @pytest.mark.smoke
 def test_service_health_check(api):

@@ -16,66 +16,124 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: UI + API tests
+  # One job per project. Each reports its own pass/fail and uploads its own JUnit + detailed report.
+  suite:
+    name: ${{ matrix.label }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    outputs:
-      outcome: ${{ steps.pytest.outcome }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { key: storefront,  marker: storefront, label: "Storefront (Sauce Demo)" }
+          - { key: banking,     marker: banking,    label: "Banking (ParaBank)" }
+          - { key: booking-api, marker: booking,    label: "Booking API (restful-booker)" }
+          - { key: youtube,     marker: youtube,    label: "YouTube Data API" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.label }}
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: >
+          pytest -m "${{ matrix.marker }}"
+          -o addopts="-ra --strict-markers -n 4"
+          --junitxml=reports/junit-${{ matrix.key }}.xml
+          --html=reports/detailed-${{ matrix.key }}.html --self-contained-html
+      - name: Upload JUnit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.key }}
+          path: reports/junit-${{ matrix.key }}.xml
+      - name: Upload detailed report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.key }}
+          path: reports/
+          retention-days: 30
+
+  # The security suite needs the OWASP Juice Shop reference target, so it runs on its own with that service.
+  security:
+    name: Security (OWASP-aligned)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
-      # OWASP Juice Shop: the intentionally-vulnerable reference target for the security suite
       juiceshop:
         image: bkimminich/juice-shop:v17.1.1
         ports:
           - 3000:3000
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
+      - run: pip install -r requirements.txt
       - name: Wait for OWASP Juice Shop
         run: |
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/rest/admin/application-version && break
             echo "waiting for Juice Shop..."; sleep 5
           done
-
-      - name: Run tests
-        id: pytest
-        continue-on-error: true   # always publish the report; the quality gate below decides pass/fail
+      - name: Run security suite
         env:
           JUICE_SHOP_URL: http://localhost:3000
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: pytest
-
-      - name: Build release-readiness report
-        if: always()
-        run: python tools/readiness_report.py reports/junit.xml --out reports/index.html --summary "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload reports
+        run: >
+          pytest -m security
+          -o addopts="-ra --strict-markers -n 4"
+          --junitxml=reports/junit-security.xml
+          --html=reports/detailed-security.html --self-contained-html
+      - name: Upload JUnit
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: junit-security
+          path: reports/junit-security.xml
+      - name: Upload detailed report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-security
           path: reports/
           retention-days: 30
 
+  # Merge every suite's JUnit into one release-readiness report and publish it.
+  report:
+    name: Release-readiness report
+    needs: [suite, security]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Collect JUnit from all suites
+        uses: actions/download-artifact@v4
+        with:
+          pattern: junit-*
+          path: reports
+          merge-multiple: true
+      - name: Build combined report
+        run: |
+          python tools/readiness_report.py reports/junit-*.xml \
+            --out reports/index.html --summary "$GITHUB_STEP_SUMMARY"
       - name: Package report for GitHub Pages
-        if: always() && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: reports/
 
   publish-report:
     name: Publish report
-    needs: test
-    if: always() && github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    needs: report
+    if: always() && github.ref == 'refs/heads/main' && needs.report.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -89,14 +147,16 @@ jobs:
 
   quality-gate:
     name: Quality gate
-    needs: test
+    needs: [suite, security]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Fail when tests failed
+      - name: Require every suite to pass
         run: |
-          if [ "${{ needs.test.outputs.outcome }}" != "success" ]; then
-            echo "::error::Test failures found. See the release-readiness report."
+          echo "Storefront/Banking/Booking/YouTube: ${{ needs.suite.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          if [ "${{ needs.suite.result }}" != "success" ] || [ "${{ needs.security.result }}" != "success" ]; then
+            echo "::error::One or more suites failed. See the release-readiness report."
             exit 1
           fi
-          echo "All exit criteria met."
+          echo "All suites passed."

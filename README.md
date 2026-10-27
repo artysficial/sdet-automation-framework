@@ -16,7 +16,7 @@ and a **release-readiness report** that turns raw results into a Go / No-go reco
 | **Systems under test** | [Sauce Demo](https://www.saucedemo.com) storefront, [ParaBank](https://parabank.parasoft.com) online bank (UI + REST), [restful-booker](https://restful-booker.herokuapp.com) and the [YouTube Data API](https://developers.google.com/youtube/v3); all public apps for automation or security practice |
 | **Security** | OWASP-aligned SQLi, XSS, access-control and security-header checks, with [OWASP Juice Shop](https://owasp.org/www-project-juice-shop/) as an intentionally-vulnerable reference target (see [SECURITY_TESTING.md](docs/SECURITY_TESTING.md)) |
 | **Stack** | Python 3.11, pytest, pytest-bdd (Gherkin), Selenium 4, requests, JSON Schema, pytest-xdist, pytest-html |
-| **CI/CD** | GitHub Actions: every push and pull request, nightly at 08:00 WIB, Juice Shop as a Docker service, reports published to GitHub Pages |
+| **CI/CD** | GitHub Actions: each project runs as its own job (Storefront, Banking, Booking API, YouTube, Security), every push and PR, nightly at 08:00 WIB; Juice Shop as a Docker service, combined report published to GitHub Pages |
 | **Coverage** | 62 tests across banking, storefront, APIs and security; BDD UI, REST contract and OWASP-aligned checks |
 | **Defects found** | [6 logged defects](docs/DEFECTS.md), including a customer-facing price shown as `$59.980000000000004` and two missing security headers |
 
@@ -41,16 +41,22 @@ and a **release-readiness report** that turns raw results into a Go / No-go reco
 
 ## Pipeline
 
+Each project is its own CI job, so a failure is attributed to one suite; their JUnit results are merged into a
+single release-readiness report.
+
 ```mermaid
 flowchart LR
-    A[Push / PR / nightly] --> B[pytest: UI + API in parallel]
-    B --> C[JUnit XML + pytest-html + screenshots]
-    C --> D[Release-readiness report]
+    A[Push / PR / nightly] --> S1[Storefront]
+    A --> S2[Banking]
+    A --> S3[Booking API]
+    A --> S4[YouTube]
+    A --> S5[Security + Juice Shop]
+    S1 & S2 & S3 & S4 & S5 --> D[Merge JUnit -> readiness report]
     D --> E[GitHub Pages]
     D --> F[Run summary]
-    B --> G{Quality gate}
-    G -- all criteria met --> H[Pass]
-    G -- failures --> I[Fail build]
+    S1 & S2 & S3 & S4 & S5 --> G{Quality gate}
+    G -- all suites pass --> H[Pass]
+    G -- any suite fails --> I[Fail build]
 ```
 
 ## Project structure

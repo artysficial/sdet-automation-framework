@@ -3,7 +3,7 @@
 The report leads with a Go / Go with conditions / No-go recommendation, then shows the exit criteria,
 open known defects, results by functional area and every test. It is a single self-contained HTML file.
 
-    python tools/readiness_report.py reports/junit.xml --out reports/index.html [--summary FILE]
+    python tools/readiness_report.py reports/junit-*.xml --out reports/index.html [--summary FILE]
 """
 
 import argparse
@@ -123,6 +123,13 @@ def render(results: list[Result], summary: dict) -> str:
         run_meta.append(f'Commit <a href="{server}/{repo}/commit/{sha}">{sha[:7]}</a>')
     if repo and run_id:
         run_meta.append(f'<a href="{server}/{repo}/actions/runs/{run_id}">CI run #{esc(os.getenv("GITHUB_RUN_NUMBER", run_id))}</a>')
+
+    # per-suite detailed HTML + screenshots are uploaded as CI artifacts, not to Pages
+    if repo and run_id:
+        detailed_href = f"{server}/{repo}/actions/runs/{run_id}"
+        detailed_label = "Per-suite reports &amp; screenshots (CI artifacts)"
+    else:
+        detailed_href, detailed_label = "detailed-report.html", "Detailed report with screenshots"
 
     by_area = defaultdict(Counter)
     for r in results:
@@ -298,8 +305,8 @@ def render(results: list[Result], summary: dict) -> str:
   </section>
 
   <section class="links">
-    <a href="detailed-report.html">Detailed report with screenshots</a>
-    <a href="junit.xml">JUnit XML</a>
+    <a href="{detailed_href}">{detailed_label}</a>
+    <a href="https://github.com/{esc(repo or 'artysficial/sdet-automation-framework')}/actions/workflows/tests.yml">CI pipeline (per-suite jobs)</a>
     <a href="https://github.com/{esc(repo or 'artysficial/sdet-automation-framework')}">Source on GitHub</a>
   </section>
 
@@ -332,12 +339,14 @@ def markdown(results: list[Result], summary: dict) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("junit")
+    parser.add_argument("junit", nargs="+", help="one or more JUnit XML files (one per CI suite)")
     parser.add_argument("--out", default="reports/index.html")
     parser.add_argument("--summary", help="also append a Markdown summary to this file (e.g. $GITHUB_STEP_SUMMARY)")
     args = parser.parse_args()
 
-    results = load(args.junit)
+    results = []
+    for path in args.junit:
+        results.extend(load(path))
     summary = evaluate(results)
     with open(args.out, "w", encoding="utf-8") as handle:
         handle.write(render(results, summary))
