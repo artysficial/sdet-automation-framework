@@ -14,7 +14,7 @@ pytestmark = [pytest.mark.security, pytest.mark.xss]
 
 
 @pytest.mark.parametrize("payload", XSS_PAYLOADS)
-def test_parabank_login_does_not_reflect_unencoded_markup(payload):
+def test_parabank_login_does_not_reflect_unencoded_markup(parabank_ready, payload):
     """Submitting script markup as the username must not be reflected unencoded on the response."""
     response = requests.post(
         f"{settings.parabank_base_url}/login.htm",

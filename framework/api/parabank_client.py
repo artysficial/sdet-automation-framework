@@ -1,5 +1,6 @@
 """Client for ParaBank's REST services. Responses are XML by default; we request JSON."""
 
+import time
 from urllib.parse import quote
 
 import requests
@@ -32,3 +33,21 @@ class ParabankClient:
 
     def transactions(self, account_id: int) -> requests.Response:
         return self._get(f"/accounts/{account_id}/transactions")
+
+
+def parabank_ready(base_url: str, attempts: int = 4) -> bool:
+    """Whether the shared ParaBank demo is up and authenticating the default user.
+
+    The public instance periodically resets its database, during which the known-good
+    john/demo login can briefly return 400. Retrying distinguishes that transient from a
+    real outage; tests use this to skip (rather than fail) when the demo is unavailable.
+    """
+    client = ParabankClient(base_url, timeout=15)
+    for attempt in range(attempts):
+        try:
+            if client.login("john", "demo").status_code == 200:
+                return True
+        except requests.RequestException:
+            pass
+        time.sleep(2 * (attempt + 1))
+    return False

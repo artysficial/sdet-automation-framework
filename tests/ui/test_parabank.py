@@ -1,11 +1,17 @@
 """ParaBank banking scenarios. Steps are kept in this module to stay independent of the storefront steps."""
 
+import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from config.settings import settings
 from framework.pages.parabank import OverviewPage, ParabankLoginPage, TransferPage
 
 scenarios("parabank.feature")
+
+
+@pytest.fixture(autouse=True)
+def _require_parabank(parabank_ready):
+    """Skip the banking UI scenarios when the shared ParaBank demo is unavailable."""
 
 
 @given("the customer is on the ParaBank login page")

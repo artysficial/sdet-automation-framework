@@ -10,7 +10,7 @@ def api() -> BookerClient:
 
 
 @pytest.fixture(scope="session")
-def parabank_api() -> ParabankClient:
+def parabank_api(parabank_ready) -> ParabankClient:
     return ParabankClient(settings.parabank_base_url, timeout=settings.api_timeout)
 
 

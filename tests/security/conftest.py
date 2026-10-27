@@ -14,12 +14,12 @@ from framework.api import BookerClient, ParabankClient
 
 
 @pytest.fixture(scope="session")
-def parabank_api() -> ParabankClient:
+def parabank_api(parabank_ready) -> ParabankClient:
     return ParabankClient(settings.parabank_base_url, timeout=settings.api_timeout)
 
 
 @pytest.fixture(scope="session")
-def parabank_headers():
+def parabank_headers(parabank_ready):
     response = requests.get(f"{settings.parabank_base_url}/index.htm", timeout=settings.api_timeout)
     return response.headers
 

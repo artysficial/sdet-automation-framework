@@ -48,6 +48,16 @@ def _record_tags(request, record_property):
     record_property("tags", ",".join(tags))
 
 
+@pytest.fixture(scope="session")
+def parabank_ready():
+    """Skip ParaBank-dependent tests when the shared demo is down (vs. failing the build)."""
+    from config.settings import settings
+    from framework.api.parabank_client import parabank_ready as _ready
+    if not _ready(settings.parabank_base_url):
+        pytest.skip("ParaBank demo unavailable or not authenticating john/demo (shared instance resetting)")
+    return True
+
+
 @pytest.fixture
 def driver(request):
     browser = create_driver(headless=not request.config.getoption("--headed"))

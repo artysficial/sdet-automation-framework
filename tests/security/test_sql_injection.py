@@ -16,7 +16,7 @@ pytestmark = [pytest.mark.security, pytest.mark.injection]
 
 @pytest.mark.smoke
 @pytest.mark.parametrize("payload", SQLI_AUTH_BYPASS)
-def test_parabank_login_does_not_allow_sql_injection_bypass(driver, payload):
+def test_parabank_login_does_not_allow_sql_injection_bypass(parabank_ready, driver, payload):
     """A SQL-injection login attempt must not authenticate the attacker."""
     ParabankLoginPage(driver).open().sign_in(payload, payload)
 
