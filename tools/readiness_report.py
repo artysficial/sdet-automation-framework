@@ -81,8 +81,9 @@ def evaluate(results: list[Result]) -> dict:
     security = [r for r in executed if "security" in r.tags]
 
     criteria = [
-        ("Smoke suite passes in full", f"{sum(r.status == 'passed' for r in smoke)} / {len(smoke)} passed",
-         bool(smoke) and all(r.status == "passed" for r in smoke)),
+        ("Smoke suite passes in full",
+         f"{sum(r.status == 'passed' for r in smoke)} / {len(smoke)} passed" if smoke else "no smoke tests in scope",
+         not any(r.status == "failed" for r in smoke)),
         ("No failures on critical paths (checkout, contract, injection, access control)",
          f"{sum(r.status == 'failed' for r in critical)} failed of {len(critical)}",
          all(r.status == "passed" for r in critical)),
@@ -110,7 +111,7 @@ def esc(value) -> str:
     return html.escape(str(value))
 
 
-def render(results: list[Result], summary: dict) -> str:
+def render(results: list[Result], summary: dict, title: str, home: str = "", projects=()) -> str:
     counts = Counter(r.status for r in results)
     duration = sum(r.seconds for r in results)
     label, css, rationale = summary["verdict"]
@@ -130,6 +131,15 @@ def render(results: list[Result], summary: dict) -> str:
         detailed_label = "Per-suite reports &amp; screenshots (CI artifacts)"
     else:
         detailed_href, detailed_label = "detailed-report.html", "Detailed report with screenshots"
+
+    back_link = f'<a class="back" href="{esc(home)}">&larr; All projects</a>' if home else ""
+    projects_card = ""
+    if projects:
+        links = "".join(f'<a href="./{esc(key)}/">{esc(name)}</a>' for key, name in projects)
+        projects_card = (f'<section class="card"><h2>Per-project reports</h2>'
+                         f'<p class="muted" style="margin-bottom:12px">Each project has its own release-readiness '
+                         f'report with its own recommendation and exit criteria.</p>'
+                         f'<div class="links">{links}</div></section>')
 
     by_area = defaultdict(Counter)
     for r in results:
@@ -237,13 +247,15 @@ def render(results: list[Result], summary: dict) -> str:
   .links a {{ text-decoration: none; border: 1px solid var(--border); padding: 8px 14px; border-radius: 12px; font-weight: 500; font-size: 14px; }}
   .links a:hover {{ border-color: var(--accent); }}
   footer {{ color: var(--muted); font-size: 13px; text-align: center; }}
+  .back {{ display: inline-block; margin-bottom: 10px; font-size: 14px; font-weight: 500; }}
 </style>
 </head>
 <body>
 <main>
   <header>
+    {back_link}
     <p class="eyebrow">Release readiness report</p>
-    <h1>Storefront, Banking, API &amp; Security</h1>
+    <h1>{esc(title)}</h1>
     <p class="meta">{" &middot; ".join(run_meta)}</p>
   </header>
 
@@ -252,6 +264,8 @@ def render(results: list[Result], summary: dict) -> str:
     <p class="label">{esc(label)}</p>
     <p>{esc(rationale)}</p>
   </section>
+
+  {projects_card}
 
   <section class="kpis">
     <div class="kpi"><b>{len(results)}</b><span>tests run</span></div>
@@ -341,15 +355,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("junit", nargs="+", help="one or more JUnit XML files (one per CI suite)")
     parser.add_argument("--out", default="reports/index.html")
+    parser.add_argument("--title", default="Storefront, Banking, API & Security", help="report heading")
+    parser.add_argument("--home", default="", help="href for a 'All projects' back-link (per-project reports)")
+    parser.add_argument("--projects", default="", help="'key=Label,key=Label' to list links to per-project reports")
     parser.add_argument("--summary", help="also append a Markdown summary to this file (e.g. $GITHUB_STEP_SUMMARY)")
     args = parser.parse_args()
+
+    projects = [tuple(pair.split("=", 1)) for pair in args.projects.split(",") if "=" in pair]
 
     results = []
     for path in args.junit:
         results.extend(load(path))
     summary = evaluate(results)
+    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as handle:
-        handle.write(render(results, summary))
+        handle.write(render(results, summary, title=args.title, home=args.home, projects=projects))
     if args.summary:
         with open(args.summary, "a", encoding="utf-8") as handle:
             handle.write(markdown(results, summary))

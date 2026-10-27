@@ -120,15 +120,26 @@ jobs:
           pattern: junit-*
           path: reports
           merge-multiple: true
-      - name: Build combined report
+      - name: Build reports (overview + one per project)
         run: |
+          mkdir -p site
+          # overview at the root, linking to each per-project report
           python tools/readiness_report.py reports/junit-*.xml \
-            --out reports/index.html --summary "$GITHUB_STEP_SUMMARY"
-      - name: Package report for GitHub Pages
+            --out site/index.html --title "All projects" \
+            --projects "storefront=Storefront (Sauce Demo),banking=Banking (ParaBank),booking-api=Booking API (restful-booker),youtube=YouTube Data API,security=Security (OWASP-aligned)" \
+            --summary "$GITHUB_STEP_SUMMARY"
+          # a separate report per project
+          build () { python tools/readiness_report.py "reports/junit-$1.xml" --out "site/$1/index.html" --title "$2" --home "../"; }
+          build storefront  "Storefront (Sauce Demo)"
+          build banking      "Banking (ParaBank)"
+          build booking-api  "Booking API (restful-booker)"
+          build youtube      "YouTube Data API"
+          build security     "Security (OWASP-aligned)"
+      - name: Package reports for GitHub Pages
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: reports/
+          path: site/
 
   publish-report:
     name: Publish report
