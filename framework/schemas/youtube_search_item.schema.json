@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "YouTube search result item",
+  "type": "object",
+  "required": ["kind", "etag", "id", "snippet"],
+  "properties": {
+    "kind": { "const": "youtube#searchResult" },
+    "etag": { "type": "string" },
+    "id": {
+      "type": "object",
+      "required": ["kind", "videoId"],
+      "properties": {
+        "kind": { "const": "youtube#video" },
+        "videoId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "snippet": {
+      "type": "object",
+      "required": ["title", "channelId", "channelTitle", "publishedAt"],
+      "properties": {
+        "title": { "type": "string" },
+        "channelId": { "type": "string", "minLength": 1 },
+        "channelTitle": { "type": "string" },
+        "publishedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T" }
+      }
+    }
+  }
+}

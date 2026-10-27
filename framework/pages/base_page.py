@@ -12,13 +12,14 @@ Locator = tuple[str, str]
 
 class BasePage:
     path = "/"
+    base_url = settings.ui_base_url
 
     def __init__(self, driver: WebDriver):
         self.driver = driver
         self.wait = WebDriverWait(driver, settings.wait_timeout)
 
     def open(self):
-        self.driver.get(settings.ui_base_url + self.path)
+        self.driver.get(self.base_url + self.path)
         return self
 
     def find(self, locator: Locator) -> WebElement:
@@ -45,4 +46,4 @@ class BasePage:
 
     @property
     def current_path(self) -> str:
-        return self.driver.current_url.removeprefix(settings.ui_base_url) or "/"
+        return self.driver.current_url.removeprefix(self.base_url) or "/"

@@ -14,8 +14,10 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-AREAS = [("auth", "Authentication"), ("checkout", "Checkout & pricing"), ("cart", "Cart"),
-         ("catalog", "Catalogue"), ("api", "Booking API")]
+# order matters: the first matching tag wins, so specific areas come before generic ones
+AREAS = [("security", "Security"), ("youtube", "YouTube API"), ("banking", "Banking"),
+         ("checkout", "Checkout & pricing"), ("cart", "Cart"), ("catalog", "Catalogue"),
+         ("auth", "Authentication")]
 MIN_PASS_RATE = 95.0
 
 
@@ -30,9 +32,12 @@ class Result:
 
     @property
     def area(self) -> str:
-        if ".api." in self.module:
+        for tag, label in AREAS:
+            if tag in self.tags:
+                return label
+        if ".api." in self.module:          # restful-booker tests with no more specific area tag
             return "Booking API"
-        return next((label for tag, label in AREAS if tag in self.tags), "Other")
+        return "Other"
 
     @property
     def title(self) -> str:
@@ -72,14 +77,18 @@ def evaluate(results: list[Result]) -> dict:
     passed = sum(r.status == "passed" for r in executed)
     pass_rate = 100.0 * passed / len(executed) if executed else 0.0
     smoke = [r for r in executed if "smoke" in r.tags]
-    critical = [r for r in executed if "checkout" in r.tags or "contract" in r.tags]
+    critical = [r for r in executed if r.tags & {"checkout", "contract", "injection", "authz"}]
+    security = [r for r in executed if "security" in r.tags]
 
     criteria = [
         ("Smoke suite passes in full", f"{sum(r.status == 'passed' for r in smoke)} / {len(smoke)} passed",
          bool(smoke) and all(r.status == "passed" for r in smoke)),
-        ("No failures on critical paths (checkout, API contract)",
+        ("No failures on critical paths (checkout, contract, injection, access control)",
          f"{sum(r.status == 'failed' for r in critical)} failed of {len(critical)}",
          all(r.status == "passed" for r in critical)),
+        ("No security findings on protected targets",
+         f"{sum(r.status == 'failed' for r in security)} findings of {len(security)} checks",
+         all(r.status == "passed" for r in security)),
         (f"Overall pass rate of at least {MIN_PASS_RATE:.0f}%", f"{pass_rate:.1f}%", pass_rate >= MIN_PASS_RATE),
         ("Known defects still reproduce as logged", f"{sum(r.status == 'known_defect' for r in results)} open",
          True),
@@ -119,7 +128,8 @@ def render(results: list[Result], summary: dict) -> str:
     for r in results:
         by_area[r.area][r.status] += 1
     area_rows = []
-    for _, area in AREAS + [("", "Other")]:
+    ordered_areas = [label for _, label in AREAS] + ["Booking API", "Other"]
+    for area in ordered_areas:
         c = by_area.get(area)
         if not c:
             continue
@@ -226,7 +236,7 @@ def render(results: list[Result], summary: dict) -> str:
 <main>
   <header>
     <p class="eyebrow">Release readiness report</p>
-    <h1>Sauce Demo storefront &amp; Booking API</h1>
+    <h1>Storefront, Banking, API &amp; Security</h1>
     <p class="meta">{" &middot; ".join(run_meta)}</p>
   </header>
 

@@ -22,6 +22,12 @@ jobs:
     timeout-minutes: 20
     outputs:
       outcome: ${{ steps.pytest.outcome }}
+    services:
+      # OWASP Juice Shop: the intentionally-vulnerable reference target for the security suite
+      juiceshop:
+        image: bkimminich/juice-shop:v17.1.1
+        ports:
+          - 3000:3000
     steps:
       - uses: actions/checkout@v4
 
@@ -33,9 +39,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Wait for OWASP Juice Shop
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/rest/admin/application-version && break
+            echo "waiting for Juice Shop..."; sleep 5
+          done
+
       - name: Run tests
         id: pytest
         continue-on-error: true   # always publish the report; the quality gate below decides pass/fail
+        env:
+          JUICE_SHOP_URL: http://localhost:3000
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: pytest
 
       - name: Build release-readiness report

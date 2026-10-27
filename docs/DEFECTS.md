@@ -10,6 +10,8 @@ red so it can be re-verified and closed.
 | [DEF-002](#def-002) | Creating a booking with a missing required field returns 500 | Booking API | Medium | P2 | Open |
 | [DEF-003](#def-003) | Invalid credentials return 200 instead of 401 | Booking API | Low | P3 | Open |
 | [DEF-004](#def-004) | Item total shows floating-point artefacts at checkout | Checkout (UI) | High | P2 | Open |
+| [DEF-005](#def-005) | No Content-Security-Policy header | ParaBank (security) | Medium | P3 | Open |
+| [DEF-006](#def-006) | No X-Frame-Options header (clickjacking) | ParaBank (security) | Medium | P3 | Open |
 
 Severity reflects impact on the user or integrator; priority reflects the recommended order of fixing.
 
@@ -107,3 +109,46 @@ formatting is inconsistent within the same summary.
 **Impact:** a customer-facing price is shown with binary floating-point noise, which undermines trust at the point of
 payment. The arithmetic is correct to the cent (verified separately by the order-total scenarios), so the root cause
 is display formatting: amounts should be rounded or held in integer cents before rendering.
+
+---
+
+## DEF-005
+
+**No Content-Security-Policy header**
+
+| | |
+|---|---|
+| Environment | https://parabank.parasoft.com/parabank/ |
+| Test | `tests/security/test_security_headers.py::test_recommended_security_header_is_present[Content-Security-Policy]` |
+| Severity / Priority | Medium / P3 |
+
+**Steps to reproduce**
+```bash
+curl -sD - https://parabank.parasoft.com/parabank/index.htm -o /dev/null | grep -i content-security-policy
+```
+
+**Expected:** a `Content-Security-Policy` response header restricting the sources the page may load.
+**Actual:** no CSP header is sent.
+**Impact:** without a CSP, the browser has no policy-level defence-in-depth against cross-site scripting or
+unexpected resource loading. OWASP A05 (Security Misconfiguration).
+
+---
+
+## DEF-006
+
+**No X-Frame-Options header (clickjacking)**
+
+| | |
+|---|---|
+| Environment | https://parabank.parasoft.com/parabank/ |
+| Test | `tests/security/test_security_headers.py::test_recommended_security_header_is_present[X-Frame-Options]` |
+| Severity / Priority | Medium / P3 |
+
+**Steps to reproduce**
+```bash
+curl -sD - https://parabank.parasoft.com/parabank/index.htm -o /dev/null | grep -i x-frame-options
+```
+
+**Expected:** `X-Frame-Options: DENY` or `SAMEORIGIN` (or a CSP `frame-ancestors` directive).
+**Actual:** no framing-control header is sent.
+**Impact:** the pages can be embedded in an attacker's iframe, enabling clickjacking. OWASP A05.

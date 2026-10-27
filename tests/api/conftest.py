@@ -1,12 +1,24 @@
 import pytest
 
 from config.settings import settings
-from framework.api import BookerClient, booking_payload
+from framework.api import BookerClient, ParabankClient, YouTubeClient, booking_payload
 
 
 @pytest.fixture(scope="session")
 def api() -> BookerClient:
     return BookerClient(settings.api_base_url, timeout=settings.api_timeout)
+
+
+@pytest.fixture(scope="session")
+def parabank_api() -> ParabankClient:
+    return ParabankClient(settings.parabank_base_url, timeout=settings.api_timeout)
+
+
+@pytest.fixture(scope="session")
+def youtube() -> YouTubeClient:
+    if not settings.youtube_api_key:
+        pytest.skip("YOUTUBE_API_KEY not set (get a free key at console.cloud.google.com)")
+    return YouTubeClient(settings.youtube_api_base, settings.youtube_api_key, timeout=settings.api_timeout)
 
 
 @pytest.fixture(scope="session")

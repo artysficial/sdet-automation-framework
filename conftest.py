@@ -9,7 +9,8 @@ import pytest
 from framework.driver_factory import create_driver
 
 REPORTS = Path(__file__).parent / "reports"
-REPORT_TAGS = {"smoke", "regression", "negative", "contract", "auth", "catalog", "cart", "checkout", "known_defect"}
+REPORT_TAGS = {"smoke", "regression", "negative", "contract", "auth", "catalog", "cart", "checkout",
+               "banking", "security", "youtube", "injection", "xss", "authz", "reference_target", "known_defect"}
 
 # Gherkin tags cannot carry arguments, so BDD scenarios tagged @known_defect map to their defect here
 KNOWN_DEFECTS = {
@@ -30,7 +31,8 @@ def pytest_html_report_title(report):
 
 def pytest_collection_modifyitems(config, items):
     for item in items:
-        layer = "ui" if "tests/ui" in item.nodeid else "api"
+        nodeid = item.nodeid.replace("\\", "/")
+        layer = "ui" if "tests/ui" in nodeid else "security" if "tests/security" in nodeid else "api"
         item.add_marker(getattr(pytest.mark, layer))
         # BDD scenarios tagged @known_defect reproduce a logged defect. strict=True turns an
         # unexpected pass into a failure, so a silent fix is noticed and the defect re-verified.

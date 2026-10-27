@@ -5,10 +5,14 @@
 | In scope | Out of scope |
 |---|---|
 | Sauce Demo storefront: sign-in, catalogue, cart, checkout and order pricing | Visual and cross-browser testing beyond Chrome |
-| restful-booker API: booking lifecycle, authorisation, contract and error handling | Load and security testing of the shared public services |
+| ParaBank online bank: sign-in, accounts overview and funds transfer (UI + REST) | Load and performance testing |
+| restful-booker API: booking lifecycle, authorisation, contract and error handling | Penetration testing beyond the detection-level security checks below |
+| YouTube Data API v3: search, video, channel and contract checks | |
+| Security: OWASP-aligned injection, XSS, access-control and header checks (see [SECURITY_TESTING.md](SECURITY_TESTING.md)) | |
 
-Both systems are public applications published for test-automation practice. The suite runs once per change and
-once nightly, keeps parallelism low and cleans up the data it creates, so it does not burden the shared services.
+All targets are public applications published for test-automation or security training. The suite runs once per
+change and once nightly, keeps parallelism low, uses only non-destructive detection-level security payloads, and
+cleans up the data it creates, so it does not burden the shared services.
 
 ## Risk-based priorities
 
